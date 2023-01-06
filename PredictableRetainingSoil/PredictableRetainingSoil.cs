@@ -10,9 +10,9 @@ namespace Shockah.PredictableRetainingSoil
 {
 	public class PredictableRetainingSoil : Mod, IPredictableRetainingSoilApi
 	{
-		private const int BasicRetainingSoilID = 370;
-		private const int QualityRetainingSoilID = 371;
-		private const int DeluxeRetainingSoilID = 920;
+		private const string BasicRetainingSoilID = "(O)370";
+		private const string QualityRetainingSoilID = "(O)371";
+		private const string DeluxeRetainingSoilID = "(O)920";
 
 		private static readonly string MultiFertilizerModQualifiedName = "MultiFertilizer.Mod, MultiFertilizer";
 		private static readonly string MultiFertilizerDirtHelperQualifiedName = "MultiFertilizer.Framework.DirtHelper, MultiFertilizer";
@@ -24,7 +24,7 @@ namespace Shockah.PredictableRetainingSoil
 
 		private bool IsMultiFertilizerLoaded { get; set; } = false;
 		private Func<string?> MultiFertilizerKeyRetain { get; set; } = null!;
-		private Func<HoeDirt, int?> GetMultiFertilizerRetainingSoilType { get; set; } = null!;
+		private Func<HoeDirt, string?> GetMultiFertilizerRetainingSoilType { get; set; } = null!;
 
 		private bool IsStayingWateredViaRetainingSoil = false;
 
@@ -252,7 +252,7 @@ namespace Shockah.PredictableRetainingSoil
 
 			if (__instance.Category != SObject.fertilizerCategory)
 				return;
-			var retainingSoilDays = Instance.GetRetainingSoilDays(__instance.ParentSheetIndex);
+			var retainingSoilDays = Instance.GetRetainingSoilDays(__instance.QualifiedItemId);
 			if (retainingSoilDays is null)
 				return;
 
@@ -265,7 +265,7 @@ namespace Shockah.PredictableRetainingSoil
 		public bool HasRetainingSoil(HoeDirt soil)
 			=> GetRetainingSoilType(soil) != null;
 
-		public int? GetRetainingSoilType(HoeDirt soil)
+		public string? GetRetainingSoilType(HoeDirt soil)
 		{
 			if (IsMultiFertilizerLoaded)
 				return GetMultiFertilizerRetainingSoilType(soil);
@@ -289,20 +289,20 @@ namespace Shockah.PredictableRetainingSoil
 			if (retainingSoilType is null)
 				return;
 
-			var retainingSoilDays = GetRetainingSoilDays(retainingSoilType.Value);
+			var retainingSoilDays = GetRetainingSoilDays(retainingSoilType);
 			if (retainingSoilDays is not null)
 				soil.SetRetainingSoilDaysLeft(retainingSoilDays.Value);
 		}
 		#endregion
 
 		#region Object
-		public bool IsRetainingSoil(int index)
-			=> GetRetainingSoilDays(index) != null;
+		public bool IsRetainingSoil(string qualifiedItemId)
+			=> GetRetainingSoilDays(qualifiedItemId) != null;
 
-		public int? GetRetainingSoilDays(int index)
+		public int? GetRetainingSoilDays(string qualifiedItemId)
 		{
 			// TODO: maybe add some API for other mods to add their own, but no idea what to do about config then (probably also make it part of the API)
-			return index switch
+			return qualifiedItemId switch
 			{
 				BasicRetainingSoilID => Config.BasicRetainingSoilDays,
 				QualityRetainingSoilID => Config.QualityRetainingSoilDays,

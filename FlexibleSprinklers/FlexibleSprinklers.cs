@@ -62,7 +62,7 @@ namespace Shockah.FlexibleSprinklers
 
 				if (IsSlimeHutchWaterSpotsInstalled)
 				{
-					var tileIndex = location.getTileIndexAt(new((int)v.X, (int)v.Y), "Buildings");
+					var tileIndex = location.getTileIndexAt((int)v.X, (int)v.Y, "Buildings");
 					if (tileIndex is 2134 or 2135)
 						return true;
 				}

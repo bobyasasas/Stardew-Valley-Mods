@@ -2,7 +2,7 @@
 	<PropertyGroup>
 		<RootNamespace>Shockah.PleaseGiftMeInPerson</RootNamespace>
 		<Version>1.0.3</Version>
-		<TargetFramework>net5.0</TargetFramework>
+		<TargetFramework>net6.0</TargetFramework>
 		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<WarningsAsErrors>Nullable</WarningsAsErrors>

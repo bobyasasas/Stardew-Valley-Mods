@@ -15,5 +15,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)HarmonyExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IL\TranspileHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IL\TranspileWorker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NewIL\ILBlockMatcher.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NewIL\ILMatcher.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NewIL\ILPointerMatcher.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NewIL\ILMatch.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NewIL\ILMatcherException.cs" />
   </ItemGroup>
 </Project>

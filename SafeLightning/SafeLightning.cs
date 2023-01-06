@@ -1,5 +1,5 @@
 ﻿using HarmonyLib;
-using Netcode;
+using Microsoft.Xna.Framework;
 using Shockah.CommonModCode;
 using Shockah.CommonModCode.GMCM;
 using Shockah.CommonModCode.IL;
@@ -9,7 +9,7 @@ using StardewValley;
 using StardewValley.TerrainFeatures;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 
 namespace Shockah.SafeLightning
@@ -74,105 +74,112 @@ namespace Shockah.SafeLightning
 			Instance.DidPreventLast = false;
 		}
 
-		private static IEnumerable<CodeInstruction> Utility_performLightningUpdate_Transpiler(IEnumerable<CodeInstruction> enumerableInstructions, ILGenerator il)
+		private static IEnumerable<CodeInstruction> Utility_performLightningUpdate_Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator il, MethodBase original)
 		{
-			var instructions = enumerableInstructions.ToList();
+			try
+			{
+				var methodLocals = original.GetMethodBody()!.LocalVariables;
 
-			// IL to find:
-			// IL_023d: isinst StardewValley.TerrainFeatures.FruitTree
-			// IL_0242: brtrue IL_036e
-			var worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
+				return new ILBlockMatcher(instructions)
+					// find the place to jump to whenever we want to stop an actual strike from happening
+					.Find(
+						ILBlockMatcher.FindOccurence.Last, ILBlockMatcher.FindBounds.AllInstructions,
+						ILMatches.Newobj(AccessTools.DeclaredConstructor(typeof(Farm.LightningStrikeEvent))),
+						ILMatches.Stloc<Farm.LightningStrikeEvent>(methodLocals),
+						ILMatches.Ldloc<Farm.LightningStrikeEvent>(methodLocals),
+						ILMatches.LdcI4(1),
+						ILMatches.Stfld(AccessTools.Field(typeof(Farm.LightningStrikeEvent), nameof(Farm.LightningStrikeEvent.smallFlash)))
+					)
+					.StartPointer
+					.CreateLabel(il, out var smallLightningStrikeLabel)
+
+					.AllInstructionsBlock
+
+					// modify the small lightning strike (which will also be called by strikes we stopped)
+					.Find(
+						ILBlockMatcher.FindOccurence.Last, ILBlockMatcher.FindBounds.AllInstructions,
+						ILMatches.Ldloc<Farm>(methodLocals),
+						ILMatches.Ldfld("lightningStrikeEvent"),
+						ILMatches.Ldloc<Farm.LightningStrikeEvent>(methodLocals),
+						ILMatches.Call("Fire")
+					)
+					.EndPointer
+					.Insert(
+						new CodeInstruction(OpCodes.Dup),
+						new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(SafeLightning.Utility_performLightningUpdate_Transpiler_ModifyStrikeEvent)))
+					)
+
+					// stopping lightning rod strikes
+					.Find(
+						ILBlockMatcher.FindOccurence.First, ILBlockMatcher.FindBounds.AllInstructions,
+						ILMatches.Ldloc<Farm>(methodLocals),
+						ILMatches.Ldfld("objects"),
+						ILMatches.Ldloc<Vector2>(methodLocals).WithAutoAnchor(out var tilePositionLocalAnchor),
+						ILMatches.Call("get_Item"),
+						ILMatches.Ldfld("heldObject"),
+						ILMatches.Call("get_Value"),
+						ILMatches.Brtrue
+					)
+					.Anchors[tilePositionLocalAnchor]
+					.CreateLdlocInstruction(out var tilePositionLoadInstruction)
+					.Anchors[ILBlockMatcher.LastFindEndPointerAnchor]
+					.Advance()
+					.Insert(
+						tilePositionLoadInstruction,
+						new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(SafeLightning.Utility_performLightningUpdate_Transpiler_ShouldStrikeLightningRod))),
+						new CodeInstruction(OpCodes.Brfalse, smallLightningStrikeLabel)
+					)
+
+					// stopping fruit tree strikes
+					.Find(
+						ILBlockMatcher.FindOccurence.First, ILBlockMatcher.FindBounds.AllInstructions,
+						ILMatches.Isinst<FruitTree>(),
+						ILMatches.Stloc<FruitTree>(methodLocals),
+						ILMatches.Ldloc<FruitTree>(methodLocals).WithAutoAnchor(out var fruitTreeLocalAnchor),
+						ILMatches.Brfalse.WithAutoAnchor(out var notFruitTreeBranchAnchor)
+					)
+					.Anchors[notFruitTreeBranchAnchor]
+					.ExtractBranchTarget(out var notFruitTreeBranchLabel)
+					.Anchors[fruitTreeLocalAnchor]
+					.CreateLdlocInstruction(out var fruitTreeLoadInstruction)
+					.Anchors[ILBlockMatcher.LastFindEndPointerAnchor]
+					.Advance()
+					.CreateLabel(il, out var fruitTreeStrikeProceedLabel)
+					.Insert(
+						fruitTreeLoadInstruction,
+						new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(SafeLightning.Utility_performLightningUpdate_Transpiler_ShouldStrikeFruitTree))),
+						new CodeInstruction(OpCodes.Brfalse, fruitTreeStrikeProceedLabel),
+						new CodeInstruction(OpCodes.Leave, smallLightningStrikeLabel)
+					)
+
+					// stopping tile (terrain feature) strikes
+					.JumpToLabel(notFruitTreeBranchLabel)
+					.CreateLdlocInstruction(out var kvpLoadInstruction)
+					.CreateLabel(il, out var tileStrikeProceedLabel)
+					.Insert(
+						kvpLoadInstruction,
+						new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(SafeLightning.Utility_performLightningUpdate_Transpiler_ShouldStrikeTile))),
+						new CodeInstruction(OpCodes.Brfalse, tileStrikeProceedLabel),
+						new CodeInstruction(OpCodes.Leave, smallLightningStrikeLabel)
+					)
+
+					.AllInstructions;
+			}
+			catch (Exception ex)
 			{
-				i => i.opcode == OpCodes.Isinst && Equals(i.operand, typeof(FruitTree)),
-				i => i.IsBrtrue()
-			});
-			if (worker is null)
-			{
-				Instance.Monitor.Log($"Could not patch methods - Safe Lightning probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
+				Instance.Monitor.Log($"Could not patch methods - {Instance.ModManifest.Name} probably won't work.\nReason: {ex}", LogLevel.Error);
 				return instructions;
 			}
-
-			worker.Postfix(new[]
-			{
-				new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(Utility_performLightningUpdate_Transpiler_ShouldContinueWithTile))),
-				new CodeInstruction(OpCodes.Brfalse, worker[1].operand)
-			});
-
-			// IL to find:
-			// IL_0375: isinst StardewValley.TerrainFeatures.FruitTree
-			// IL_037a: brfalse.s IL_03df
-			worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
-			{
-				i => i.opcode == OpCodes.Isinst && Equals(i.operand, typeof(FruitTree)),
-				i => i.IsBrfalse()
-			}, startIndex: worker.EndIndex);
-			if (worker is null)
-			{
-				Instance.Monitor.Log($"Could not patch methods - Safe Lightning probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
-				return instructions;
-			}
-
-			worker.Postfix(new[]
-			{
-				new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(Utility_performLightningUpdate_Transpiler_ShouldContinueWithFruitTree))),
-				new CodeInstruction(OpCodes.Brfalse, worker[1].operand)
-			});
-
-			int supposedToFind = 3;
-			int nextStartIndex = 0;
-			while (true)
-			{
-				// IL to find (example, there are 3 occurences, we're finding all 3):
-				// IL_01ba: ldloc.2 / ldloc.11
-				// IL_01bb: callvirt instance void class Netcode.AbstractNetEvent1`1<class StardewValley.Farm/LightningStrikeEvent>::Fire(!0)
-				worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
-				{
-					i => i.IsLdloc(),
-					i => i.opcode == OpCodes.Callvirt && Equals(i.operand, AccessTools.Method(typeof(AbstractNetEvent1<Farm.LightningStrikeEvent>), nameof(AbstractNetEvent1<Farm.LightningStrikeEvent>.Fire)))
-				}, startIndex: nextStartIndex);
-				if (worker is null)
-				{
-					if (supposedToFind < 0)
-					{
-						Instance.Monitor.Log($"Found more matching IL than expected. Safe Lightning may behave incorrectly.", LogLevel.Warn);
-					}
-					else if (supposedToFind > 0)
-					{
-						Instance.Monitor.Log($"Could not patch methods - Safe Lightning probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
-						return instructions;
-					}
-					break;
-				}
-				supposedToFind--;
-
-				worker.Insert(1, new[]
-				{
-					new CodeInstruction(OpCodes.Dup),
-					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(Utility_performLightningUpdate_Transpiler_ModifyStrikeEvent)))
-				});
-				if (worker[4].opcode == OpCodes.Ret && nextStartIndex == 0) // originally at 2, +2 instructions we added
-				{
-					worker.Insert(1, new[]
-					{
-						new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SafeLightning), nameof(Utility_performLightningUpdate_Transpiler_WillStrikeLightningRod)))
-					});
-				}
-
-				nextStartIndex = worker.EndIndex;
-			}
-
-			return instructions;
 		}
 
-		public static bool Utility_performLightningUpdate_Transpiler_ShouldContinueWithTile()
+		public static bool Utility_performLightningUpdate_Transpiler_ShouldStrikeLightningRod(Vector2 rodPosition)
 		{
-			Instance.LastTargetType = StrikeTargetType.Tile;
-			bool shouldPrevent = Instance.Config.SafeTiles;
-			Instance.DidPreventLast = shouldPrevent;
-			return !shouldPrevent;
+			Instance.LastTargetType = StrikeTargetType.LightningRod;
+			Instance.DidPreventLast = false;
+			return true;
 		}
 
-		public static bool Utility_performLightningUpdate_Transpiler_ShouldContinueWithFruitTree()
+		public static bool Utility_performLightningUpdate_Transpiler_ShouldStrikeFruitTree(FruitTree tree)
 		{
 			Instance.LastTargetType = StrikeTargetType.FruitTree;
 			bool shouldPrevent = Instance.Config.SafeFruitTrees;
@@ -180,9 +187,12 @@ namespace Shockah.SafeLightning
 			return !shouldPrevent;
 		}
 
-		public static void Utility_performLightningUpdate_Transpiler_WillStrikeLightningRod()
+		public static bool Utility_performLightningUpdate_Transpiler_ShouldStrikeTile(KeyValuePair<Vector2, TerrainFeature> kvp)
 		{
-			Instance.LastTargetType = StrikeTargetType.LightningRod;
+			Instance.LastTargetType = StrikeTargetType.Tile;
+			bool shouldPrevent = Instance.Config.SafeTiles;
+			Instance.DidPreventLast = shouldPrevent;
+			return !shouldPrevent;
 		}
 
 		public static void Utility_performLightningUpdate_Transpiler_ModifyStrikeEvent(Farm.LightningStrikeEvent @event)

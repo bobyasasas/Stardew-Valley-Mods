@@ -9,7 +9,7 @@ namespace Shockah.PredictableRetainingSoil
 		bool HasRetainingSoil(HoeDirt soil);
 
 		/// <summary>Returns the type of retaining soil the soil has on it.</summary>
-		int? GetRetainingSoilType(HoeDirt soil);
+		string? GetRetainingSoilType(HoeDirt soil);
 
 		/// <summary>Returns the number of days until the retaining soil on the soil runs out.</summary>
 		int? GetRetainingSoilDaysLeft(HoeDirt soil);
@@ -25,7 +25,7 @@ namespace Shockah.PredictableRetainingSoil
 
 		#region Object
 		/// <summary>Returns whether the object is a retaining soil.</summary>
-		bool IsRetainingSoil(int index);
+		bool IsRetainingSoil(string qualifiedItemId);
 
 		/// <summary>Returns the number of days the retaining soil works for.</summary>
 		/// <returns>
@@ -33,7 +33,7 @@ namespace Shockah.PredictableRetainingSoil
 		/// `-1`: if the retaining soil doesn't run out.<br />
 		/// any other int: the number of days the retaining soil works for.
 		/// </returns>
-		int? GetRetainingSoilDays(int index);
+		int? GetRetainingSoilDays(string qualifiedItemId);
 		#endregion
 	}
 }

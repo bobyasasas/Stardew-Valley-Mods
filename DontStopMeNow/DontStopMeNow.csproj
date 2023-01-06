@@ -2,7 +2,7 @@
 	<PropertyGroup>
 		<RootNamespace>Shockah.DontStopMeNow</RootNamespace>
 		<Version>1.2.0</Version>
-		<TargetFramework>net5.0</TargetFramework>
+		<TargetFramework>net6.0</TargetFramework>
 		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<WarningsAsErrors>Nullable</WarningsAsErrors>

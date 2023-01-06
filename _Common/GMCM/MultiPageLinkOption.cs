@@ -114,7 +114,7 @@ namespace Shockah.CommonModCode.GMCM
 
 				Vector2 measure = new(SpriteText.getWidthOfString(text), SpriteText.getHeightOfString(text));
 				bool hoverLink = mouseX >= valuePosition.X && mouseY >= valuePosition.Y && mouseX < valuePosition.X + measure.X && mouseY < valuePosition.Y + measure.Y;
-				SpriteText.drawString(b, text, (int)valuePosition.X, (int)valuePosition.Y, layerDepth: 1, color: hoverGMCM && hoverLink ? SpriteText.color_Gray : -1);
+				SpriteText.drawString(b, text, (int)valuePosition.X, (int)valuePosition.Y, layerDepth: 1, color: hoverGMCM && hoverLink ? SpriteText.color_Gray : SpriteText.color_Black); // TODO: make sure color_Black is right
 
 				if (hoverGMCM && hoverLink)
 				{

@@ -123,64 +123,59 @@ namespace Shockah.XPDisplay
 			DrawSkillsPageExperienceTooltip(b);
 		}
 
-		private static IEnumerable<CodeInstruction> SkillsPage_draw_Transpiler(IEnumerable<CodeInstruction> enumerableInstructions)
+		private static IEnumerable<CodeInstruction> SkillsPage_draw_Transpiler(IEnumerable<CodeInstruction> instructions)
 		{
-			var instructions = enumerableInstructions.ToList();
+			try
+			{
+				return new ILBlockMatcher(instructions)
+					.Do(matcher =>
+					{
+						return matcher
+							.Find(
+								ILMatches.AnyLdloc,
+								9,
+								ILMatches.BneUn
+							)
+							.FromStart[1]
+							.Insert(
+								new CodeInstruction(OpCodes.Ldarg_1), // `SpriteBatch`
 
-			// IL to find:
-			// IL_07bf: ldloc.3
-			// IL_07c0: ldc.i4.s 9
-			// IL_07c2: bne.un IL_0881
-			var worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
+								new CodeInstruction(OpCodes.Ldloc_0), // this *should* be the `x` local
+								new CodeInstruction(OpCodes.Ldloc_2), // this *should* be the `addedX` local
+								new CodeInstruction(OpCodes.Add),
+
+								new CodeInstruction(OpCodes.Ldloc_1), // this *should* be the `y` local
+								new CodeInstruction(OpCodes.Ldloc_3), // this *should* be the `i` local - the currently drawn level index (0-9)
+								new CodeInstruction(OpCodes.Ldloc, 4), // this *should* be the `j` local - the skill index
+								new CodeInstruction(OpCodes.Ldnull), // no skill name, it's a built-in one
+								new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_QueueDelegate)))
+							);
+					})
+					.Do(matcher =>
+					{
+						var skillsPageSkillBarsField = AccessTools.Field(typeof(SkillsPage), nameof(SkillsPage.skillBars));
+						return matcher
+							.Repeat(2, matcher =>
+							{
+								return matcher
+									.Find(
+										ILMatches.Ldarg(0),
+										ILMatches.Ldfld(skillsPageSkillBarsField),
+										AccessTools.Method(skillsPageSkillBarsField.FieldType, "GetEnumerator")
+									);
+							})
+							.FromStart[1]
+							.Insert(
+								new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_CallQueuedDelegates)))
+							);
+					})
+					.AllInstructions;
+			}
+			catch (Exception ex)
 			{
-				i => i.IsLdloc(),
-				i => i.IsLdcI4(9),
-				i => i.IsBneUn()
-			});
-			if (worker is null)
-			{
-				Instance.Monitor.Log($"Could not patch methods - XP Display probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
+				Instance.Monitor.Log($"Could not patch methods - XP Display probably won't work.\nReason: {ex}", LogLevel.Error);
 				return instructions;
 			}
-
-			worker.Insert(1, new[]
-			{
-				new CodeInstruction(OpCodes.Ldarg_1), // `SpriteBatch`
-
-				new CodeInstruction(OpCodes.Ldloc_0), // this *should* be the `x` local
-				new CodeInstruction(OpCodes.Ldloc_2), // this *should* be the `addedX` local
-				new CodeInstruction(OpCodes.Add),
-
-				new CodeInstruction(OpCodes.Ldloc_1), // this *should* be the `y` local
-				new CodeInstruction(OpCodes.Ldloc_3), // this *should* be the `i` local - the currently drawn level index (0-9)
-				new CodeInstruction(OpCodes.Ldloc, 4), // this *should* be the `j` local - the skill index
-				new CodeInstruction(OpCodes.Ldnull), // no skill name, it's a built-in one
-				new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_QueueDelegate)))
-			});
-
-			// IL to find (2nd occurence):
-			// IL_08a7: ldarg.0
-			// IL_08a8: ldfld class [System.Collections]System.Collections.Generic.List`1<class StardewValley.Menus.ClickableTextureComponent> StardewValley.Menus.SkillsPage::skillBars
-			// IL_08ad: callvirt instance valuetype [System.Collections]System.Collections.Generic.List`1/Enumerator<!0> class [System.Collections]System.Collections.Generic.List`1<class StardewValley.Menus.ClickableTextureComponent>::GetEnumerator()
-			var skillsPageSkillBarsField = AccessTools.Field(typeof(SkillsPage), nameof(SkillsPage.skillBars));
-			worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
-			{
-				i => i.IsLdarg(0),
-				i => i.LoadsField(skillsPageSkillBarsField),
-				i => i.Calls(AccessTools.Method(skillsPageSkillBarsField.FieldType, "GetEnumerator"))
-			}, occurence: 2);
-			if (worker is null)
-			{
-				Instance.Monitor.Log($"Could not patch methods - XP Display probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
-				return instructions;
-			}
-
-			worker.Insert(1, new[]
-			{
-				new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_CallQueuedDelegates)))
-			});
-
-			return instructions;
 		}
 
 		private static void SpaceCore_NewSkillsPage_draw_Postfix(SpriteBatch b)
@@ -188,101 +183,86 @@ namespace Shockah.XPDisplay
 			DrawSkillsPageExperienceTooltip(b);
 		}
 
-		private static IEnumerable<CodeInstruction> SpaceCore_NewSkillsPage_draw_Transpiler(IEnumerable<CodeInstruction> enumerableInstructions)
+		private static IEnumerable<CodeInstruction> SpaceCore_NewSkillsPage_draw_Transpiler(IEnumerable<CodeInstruction> instructions)
 		{
-			var instructions = enumerableInstructions.ToList();
+			try
+			{
+				return new ILBlockMatcher(instructions)
+					.Do(matcher =>
+					{
+						return matcher
+							.Find(
+								ILMatches.AnyLdloc,
+								9,
+								ILMatches.BneUn
+							)
+							.Do(matcher =>
+							{
+								return matcher
+									.FromStart[1]
+									.Insert(
+										new CodeInstruction(OpCodes.Ldarg_1), // `SpriteBatch`
 
-			// IL to find:
-			// IL_08b1: ldloc.s 8
-			// IL_08b3: ldc.i4.s 9
-			// IL_08b5: bne.un IL_0976
-			var worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
+										new CodeInstruction(OpCodes.Ldloc_0), // this *should* be the `x` local
+										new CodeInstruction(OpCodes.Ldloc_3), // this *should* be the `xOffset` local
+										new CodeInstruction(OpCodes.Add),
+
+										new CodeInstruction(OpCodes.Ldloc_1), // this *should* be the `y` local
+										new CodeInstruction(OpCodes.Ldloc, 8), // this *should* be the `levelIndex` local
+										new CodeInstruction(OpCodes.Ldloc, 9), // this *should* be the `skillIndex` local
+										new CodeInstruction(OpCodes.Ldnull), // no skill name, it's a built-in one
+										new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_QueueDelegate)))
+									);
+							})
+							.Find(
+								ILMatches.AnyLdloc,
+								9,
+								ILMatches.BneUn
+							)
+							.Do(matcher =>
+							{
+								return matcher
+									.FromStart[1]
+									.Insert(
+										new CodeInstruction(OpCodes.Ldarg_1), // `SpriteBatch`
+
+										new CodeInstruction(OpCodes.Ldloc_0), // this *should* be the `x` local
+										new CodeInstruction(OpCodes.Ldloc_3), // this *should* be the `xOffset` local
+										new CodeInstruction(OpCodes.Add),
+
+										new CodeInstruction(OpCodes.Ldloc_1), // this *should* be the `y` local
+										new CodeInstruction(OpCodes.Ldloc, 19), // this *should* be the `levelIndex` local
+										new CodeInstruction(OpCodes.Ldloc_2), // this *should* be the `indexWithLuckSkill` local
+										new CodeInstruction(OpCodes.Ldloc, 17), // this *should* be the `skillName` local
+										new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_QueueDelegate)))
+									);
+							});
+					})
+					.Do(matcher =>
+					{
+						var skillsPageSkillBarsField = AccessTools.Field(AccessTools.TypeByName(SpaceCoreNewSkillsPageQualifiedName), "skillBars");
+						return matcher
+							.Repeat(2, matcher =>
+							{
+								return matcher
+									.Find(
+										ILMatches.Ldarg(0),
+										ILMatches.Ldfld(skillsPageSkillBarsField),
+										AccessTools.Method(skillsPageSkillBarsField.FieldType, "GetEnumerator")
+									);
+							})
+							.FromStart[1]
+							.Insert(
+								new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_CallQueuedDelegates)))
+							);
+					})
+					.AllInstructions;
+			}
+			catch (Exception ex)
 			{
-				i => i.IsLdloc(),
-				i => i.IsLdcI4(9),
-				i => i.IsBneUn()
-			});
-			if (worker is null)
-			{
-				Instance.Monitor.Log($"Could not patch SpaceCore methods - XP Display probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
+				Instance.Monitor.Log($"Could not patch SpaceCore methods - XP Display probably won't work.\nReason: {ex}", LogLevel.Error);
 				return instructions;
 			}
-			else
-			{
-				// TODO: some kind of local finder to stop hardcoding the indexes
-				worker.Insert(1, new[]
-				{
-					new CodeInstruction(OpCodes.Ldarg_1), // `SpriteBatch`
-
-					new CodeInstruction(OpCodes.Ldloc_0), // this *should* be the `x` local
-					new CodeInstruction(OpCodes.Ldloc_3), // this *should* be the `xOffset` local
-					new CodeInstruction(OpCodes.Add),
-
-					new CodeInstruction(OpCodes.Ldloc_1), // this *should* be the `y` local
-					new CodeInstruction(OpCodes.Ldloc, 8), // this *should* be the `levelIndex` local
-					new CodeInstruction(OpCodes.Ldloc, 9), // this *should* be the `skillIndex` local
-					new CodeInstruction(OpCodes.Ldnull), // no skill name, it's a built-in one
-					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_QueueDelegate)))
-				});
-			}
-
-			// IL to find:
-			// IL_0cc1: ldloc.s 19
-			// IL_0cc3: ldc.i4.s 9
-			// IL_0cc5: bne.un IL_0d84
-			worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
-			{
-				i => i.IsLdloc(),
-				i => i.IsLdcI4(9),
-				i => i.IsBneUn()
-			}, startIndex: worker?.EndIndex ?? 0);
-			if (worker is null)
-			{
-				Instance.Monitor.Log($"Could not patch SpaceCore methods - XP Display probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
-				return instructions;
-			}
-			else
-			{
-				// TODO: some kind of local finder to stop hardcoding the indexes
-				worker.Insert(1, new[]
-				{
-					new CodeInstruction(OpCodes.Ldarg_1), // `SpriteBatch`
-
-					new CodeInstruction(OpCodes.Ldloc_0), // this *should* be the `x` local
-					new CodeInstruction(OpCodes.Ldloc_3), // this *should* be the `xOffset` local
-					new CodeInstruction(OpCodes.Add),
-
-					new CodeInstruction(OpCodes.Ldloc_1), // this *should* be the `y` local
-					new CodeInstruction(OpCodes.Ldloc, 19), // this *should* be the `levelIndex` local
-					new CodeInstruction(OpCodes.Ldloc_2), // this *should* be the `indexWithLuckSkill` local
-					new CodeInstruction(OpCodes.Ldloc, 17), // this *should* be the `skillName` local
-					new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_QueueDelegate)))
-				});
-			}
-
-			// IL to find (2nd occurence):
-			// IL_0dbc: ldarg.0
-			// IL_0dbd: ldfld class [System.Collections]System.Collections.Generic.List`1<class ['Stardew Valley']StardewValley.Menus.ClickableTextureComponent> SpaceCore.Interface.NewSkillsPage::skillBars
-			// IL_0dc2: callvirt instance valuetype [System.Collections]System.Collections.Generic.List`1/Enumerator<!0> class [System.Collections]System.Collections.Generic.List`1<class ['Stardew Valley']StardewValley.Menus.ClickableTextureComponent>::GetEnumerator()
-			var skillsPageSkillBarsField = AccessTools.Field(AccessTools.TypeByName(SpaceCoreNewSkillsPageQualifiedName), "skillBars");
-			worker = TranspileWorker.FindInstructions(instructions, new Func<CodeInstruction, bool>[]
-			{
-				i => i.IsLdarg(0),
-				i => i.LoadsField(skillsPageSkillBarsField),
-				i => i.Calls(AccessTools.Method(skillsPageSkillBarsField.FieldType, "GetEnumerator"))
-			}, occurence: 2);
-			if (worker is null)
-			{
-				Instance.Monitor.Log($"Could not patch SpaceCore methods - XP Display probably won't work.\nReason: Could not find IL to transpile.", LogLevel.Error);
-				return instructions;
-			}
-
-			worker.Insert(1, new[]
-			{
-				new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(XPDisplay), nameof(SkillsPage_draw_CallQueuedDelegates)))
-			});
-
-			return instructions;
 		}
 
 		public static void SkillsPage_draw_QueueDelegate(SpriteBatch b, int x, int y, int levelIndex, int uiSkillIndex, string? spaceCoreSkillName)

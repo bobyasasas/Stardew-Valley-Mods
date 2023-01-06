@@ -53,7 +53,7 @@ namespace Shockah.Hibernation
 
 			harmony.TryPatch(
 				monitor: Monitor,
-				original: () => AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performTouchAction)),
+				original: () => AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performTouchAction), new Type[] { typeof(string[]), typeof(Vector2) }),
 				prefix: new HarmonyMethod(typeof(Hibernation), nameof(GameLocation_performTouchAction_Prefix)),
 				postfix: new HarmonyMethod(typeof(Hibernation), nameof(GameLocation_performTouchAction_Postfix))
 			);
@@ -204,9 +204,9 @@ namespace Shockah.Hibernation
 			return null;
 		}
 
-		private static void GameLocation_performTouchAction_Prefix(string fullActionString)
+		private static void GameLocation_performTouchAction_Prefix(string[] action)
 		{
-			if (fullActionString.Split(' ')[0] != "Sleep")
+			if (action[0] != "Sleep")
 				return;
 			Instance.TouchSleepActionInProgress = true;
 		}

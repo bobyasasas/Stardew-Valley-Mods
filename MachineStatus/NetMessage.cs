@@ -10,7 +10,7 @@ namespace Shockah.MachineStatus
 {
 	internal static class NetMessage
 	{
-		private const int CrabPotID = 710;
+		private const string CrabPotID = "(O)710";
 
 		public static class Entity
 		{
@@ -38,18 +38,16 @@ namespace Shockah.MachineStatus
 
 			public readonly struct SObject
 			{
-				public readonly int ParentSheetIndex { get; }
+				public readonly string QualifiedItemId { get; }
 				public readonly string Name { get; }
-				public readonly bool BigCraftable { get; }
 				public readonly bool ShowNextIndex { get; }
 				public readonly Color? Color { get; }
 				public readonly bool ColorSameIndexAsParentSheetIndex { get; }
 
-				public SObject(int parentSheetIndex, string name, bool bigCraftable, bool showNextIndex, Color? color, bool colorSameIndexAsParentSheetIndex)
+				public SObject(string qualifiedItemId, string name, bool showNextIndex, Color? color, bool colorSameIndexAsParentSheetIndex)
 				{
-					this.ParentSheetIndex = parentSheetIndex;
+					this.QualifiedItemId = qualifiedItemId;
 					this.Name = name;
-					this.BigCraftable = bigCraftable;
 					this.ShowNextIndex = showNextIndex;
 					this.Color = color;
 					this.ColorSameIndexAsParentSheetIndex = colorSameIndexAsParentSheetIndex;
@@ -66,9 +64,8 @@ namespace Shockah.MachineStatus
 					}
 
 					return new(
-						@object.ParentSheetIndex,
+						@object.QualifiedItemId,
 						@object.Name,
-						@object.bigCraftable.Value,
 						@object.showNextIndex.Value,
 						color,
 						colorSameIndexAsParentSheetIndex
@@ -76,25 +73,24 @@ namespace Shockah.MachineStatus
 				}
 
 				public bool Matches(SVObject @object)
-					=> ParentSheetIndex == @object.ParentSheetIndex && BigCraftable == @object.bigCraftable.Value && Name == @object.Name;
+					=> QualifiedItemId == @object.QualifiedItemId && Name == @object.Name;
 
 				public SVObject Retrieve(IntPoint? tileLocation)
 				{
 					SVObject result;
 					if (tileLocation is null)
 					{
-						result = Color.HasValue ? new ColoredObject(ParentSheetIndex, 1, Color.Value) : new SVObject(ParentSheetIndex, 1);
+						result = Color.HasValue ? new ColoredObject(QualifiedItemId, 1, Color.Value) : new SVObject(QualifiedItemId, 1);
 					}
 					else
 					{
-						if (!BigCraftable && ParentSheetIndex == CrabPotID)
+						if (QualifiedItemId == CrabPotID)
 							result = new CrabPot(new Vector2(tileLocation.Value.X, tileLocation.Value.Y));
 						else
-							result = new SVObject(new Vector2(tileLocation.Value.X, tileLocation.Value.Y), ParentSheetIndex, 1);
+							result = new SVObject(new Vector2(tileLocation.Value.X, tileLocation.Value.Y), QualifiedItemId, 1);
 					}
 
 					result.Name = Name;
-					result.bigCraftable.Value = BigCraftable;
 					result.showNextIndex.Value = ShowNextIndex;
 					if (result is ColoredObject colored)
 						colored.ColorSameIndexAsParentSheetIndex = ColorSameIndexAsParentSheetIndex;
@@ -102,7 +98,7 @@ namespace Shockah.MachineStatus
 				}
 
 				public override string ToString()
-					=> $"{ParentSheetIndex}:{Name}{(BigCraftable ? " (BigCraftable)" : "")}";
+					=> $"{QualifiedItemId}:{Name}";
 			}
 		}
 

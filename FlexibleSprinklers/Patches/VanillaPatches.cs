@@ -201,7 +201,9 @@ namespace Shockah.FlexibleSprinklers
 		private static void Object_ApplySprinklerAnimation_Prefix(SObject __instance, GameLocation location)
 		{
 			// remove all temporary sprites related to this sprinkler
-			location.TemporarySprites.RemoveAll(sprite => sprite.id == __instance.TileLocation.X * 4000f + __instance.TileLocation.Y);
+			var toRemove = location.TemporarySprites.Where(sprite => sprite.id == __instance.TileLocation.X * 4000f + __instance.TileLocation.Y).ToList();
+			foreach (var sprite in toRemove)
+				location.TemporarySprites.Remove(sprite);
 		}
 
 		private static void SlimeHutch_DayUpdate_Prefix(SlimeHutch __instance)
